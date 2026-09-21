@@ -1,0 +1,6 @@
+
+V2.2: 47 tests + 9 subtests pass. Thêm 8 kiểm tra cầu sinh số, Pascal,
+thiếu dữ liệu, không dùng kết quả tương lai, tính tiền và nhật ký cố định.
+jsdom: Dashboard mới, tab dự đoán, bảng cầu, chạy backtest và DOM biểu đồ pass.
+Canvas được mô phỏng. Chưa kiểm thử trực quan trình duyệt thật hoặc chạy trên Windows.
+Dữ liệu kiểm tra là tổng hợp, không phải bằng chứng khả năng dự báo XSMB thực tế.
