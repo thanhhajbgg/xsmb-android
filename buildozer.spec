@@ -10,7 +10,7 @@ source.exclude_patterns = *.spec,*.bat,*.ps1,requirements-dev.txt,*.apk,*.exe,bu
 
 version = 2.2.0
 
-requirements = python3,kivy==2.3.0,numpy==v1.26.4,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna
+requirements = python3,kivy==2.3.0,numpy==1.23.5,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna
 
 orientation = portrait
 fullscreen = 0
