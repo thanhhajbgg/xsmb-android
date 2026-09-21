@@ -11,7 +11,7 @@ source.exclude_patterns = *.spec,*.bat,*.ps1,requirements-dev.txt,*.apk,*.exe,bu
 version = 2.2.0
 
 # BỎ reportlab, bỏ lxml, bỏ pymupdf — chỉ giữ những gì chắc chắn build được
-requirements = python3,kivy==2.3.0,numpy,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna
+requirements = python3,kivy==2.3.0,numpy,beautifulsoup4==4.12.3,openpyxl==3.0.10,chardet==5.2.0,requests==2.31.0
 
 orientation = portrait
 fullscreen = 0
