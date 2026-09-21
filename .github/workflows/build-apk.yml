@@ -16,28 +16,43 @@ on:
 
 jobs:
   build:
-    name: Build APK
+    name: Build APK trong kivy/buildozer
     runs-on: ubuntu-22.04
     timeout-minutes: 120
+
+    container:
+      image: kivy/buildozer:latest
+      options: --user root
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build APK với Buildozer Action
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          command: android ${{ github.event.inputs.build_type || 'debug' }}
-          buildozer_version: stable
-          workdir: .
+      - name: Cho phép git trong container
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+
+      - name: Kiểm tra môi trường
+        run: |
+          echo "Python: $(python --version 2>&1)"
+          echo "Buildozer: $(buildozer --version 2>&1)"
+          echo "Cython: $(cython --version 2>&1)"
+          echo "SDK dir: $ANDROIDSDK"
+          echo "NDK dir: $ANDROIDNDK"
+
+      - name: Build APK
+        env:
+          BUILDOZER_WARN_ON_ROOT: 0
+        run: |
+          set -o pipefail
+          buildozer -v android ${{ github.event.inputs.build_type || 'debug' }} 2>&1 | tee build.log
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: buildozer-log
-          path: .buildozer/android/platform/build-*/build.log
+          name: build-log
+          path: build.log
           retention-days: 7
           if-no-files-found: ignore
 
