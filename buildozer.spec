@@ -4,13 +4,14 @@ package.name = xsmbstudio
 package.domain = vn.xsmb
 
 source.dir = .
-source.include_exts = py,png,jpg,jpeg,atlas,json,csv,html,css,js,md,txt,db,ttf
-source.exclude_dirs = .venv,tests,dist,build,__pycache__,.git,docs,.buildozer,bin
-source.exclude_patterns = *.spec,*.bat,*.ps1,requirements-dev.txt,*.apk,*.exe
+source.include_exts = py,png,jpg,jpeg,atlas,json,csv,html,css,js,md,txt,db,ttf,otf
+source.exclude_dirs = .venv,tests,dist,build,__pycache__,.git,docs,.buildozer,bin,.github
+source.exclude_patterns = *.spec,*.bat,*.ps1,requirements-dev.txt,*.apk,*.exe,build.log
 
 version = 2.2.0
 
-requirements = python3,kivy==2.3.0,numpy,beautifulsoup4,openpyxl,reportlab,chardet,requests,urllib3,certifi,idna,lxml
+# Bỏ lxml vì dễ fail compile trên ARM64; bs4 sẽ dùng html.parser
+requirements = python3,kivy==2.3.0,numpy==1.26.4,beautifulsoup4,openpyxl,reportlab,chardet,requests,urllib3,certifi,idna
 
 orientation = portrait
 fullscreen = 0
