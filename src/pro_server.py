@@ -1,4 +1,4 @@
-import argparse,json,logging,mimetypes,secrets,sqlite3,sys,threading,webbrowser
+import argparse,json,logging,mimetypes,os,secrets,sqlite3,sys,threading,webbrowser
 from datetime import date,datetime,timedelta
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
@@ -13,6 +13,10 @@ from .reports import export_bytes
 from .paths import get_data_dir
 
 
+def _is_android():
+    return hasattr(sys, "getandroidapilevel") or "ANDROID_ARGUMENT" in os.environ
+
+
 def integer(v,low=1,high=1000000000):
     if isinstance(v,bool) or not str(v).isdigit() or not low<=int(v)<=high:raise ValueError(f'Cần số nguyên từ {low} đến {high}.')
     return int(v)
@@ -25,6 +29,7 @@ def cash_options(data):
 
 def iso_day(value):
     return date.fromisoformat(value).isoformat() if value else None
+
 
 class App:
     def __init__(self,service):
@@ -59,7 +64,6 @@ class App:
                         result=cau_backtest(draws,window=integer(data.get('window',180),60,730),min_support=integer(data.get('min_support',20),5,100),**pair_opts,progress=self.progress,cancel=self.cancel_event.is_set)
                         self.service.set('last_cau_backtest',result)
                     elif kind=='backtest':
-                        # Historical comparison always uses original weights; avoid post-selection optimism.
                         result=evaluate(draws,**opts,progress=self.progress,cancel=self.cancel_event.is_set)
                         self.service.set('last_backtest',result)
                     else:
@@ -176,16 +180,32 @@ def make_server(service=None,port=0):
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--no-browser',action='store_true');parser.add_argument('--port',type=int,default=0);args=parser.parse_args()
-    directory=get_data_dir();logging.basicConfig(filename=directory/'app_v2.log',level=logging.INFO)
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--no-browser',action='store_true')
+    parser.add_argument('--port',type=int,default=0)
+    args=parser.parse_args()
+
+    # Android: đọc biến môi trường do main_android.py đặt
+    if os.environ.get('XSMB_NO_BROWSER') == '1':
+        args.no_browser = True
+    if os.environ.get('XSMB_PORT'):
+        try: args.port = int(os.environ['XSMB_PORT'])
+        except ValueError: pass
+
+    directory=get_data_dir()
+    logging.basicConfig(filename=directory/'app_v2.log',level=logging.INFO)
     db=directory/'xsmb.db';backup=directory/'xsmb_before_v2.db'
     if db.exists() and not backup.exists():
         with sqlite3.connect(db) as source,sqlite3.connect(backup) as target:source.backup(target)
     server=make_server(port=args.port);url=f'http://127.0.0.1:{server.server_port}'
-    print('XSMB V2.1 PRO:',url,flush=True)
-    if not args.no_browser:webbrowser.open(url)
-    try:server.serve_forever()
-    except KeyboardInterrupt:pass
-    finally:server.server_close()
+    print('XSMB V2.2 PRO:',url,flush=True)
+    if not args.no_browser and not _is_android():
+        try: webbrowser.open(url)
+        except Exception: pass
+    try: server.serve_forever()
+    except KeyboardInterrupt: pass
+    finally: server.server_close()
 
-if __name__=='__main__':main()
+
+if __name__ == '__main__':
+    main()
