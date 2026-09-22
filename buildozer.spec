@@ -10,10 +10,10 @@ source.exclude_patterns = *.pyc,*.pyo,*.md,*.bat,*.ps1
 
 version = 1.0.0
 
-# Hạ numpy xuống 1.24.4 để tương thích với Android
-requirements = python3,kivy==2.3.0,cython,numpy==1.24.4,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna,pyjnius,android
+# Hạ numpy xuống 1.22.4 để tương thích tốt hơn với Android
+requirements = python3,kivy==2.3.0,cython,numpy==1.22.4,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna,pyjnius,android
 
-# Chuyển sang nhánh develop để có các bản vá lỗi mới nhất
+# Giữ nhánh develop để có các bản vá lỗi mới nhất
 p4a.bootstrap = sdl2
 p4a.fork = kivy
 p4a.branch = develop
