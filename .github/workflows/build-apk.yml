@@ -72,7 +72,8 @@ jobs:
         with:
           name: build-log
           path: build.log
-            - name: Cài đặt dependencies hệ thống
+          
+      - name: Cài đặt dependencies hệ thống
         run: |
           apt-get update
           apt-get install -y --no-install-recommends software-properties-common
