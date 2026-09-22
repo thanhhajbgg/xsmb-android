@@ -72,3 +72,15 @@ jobs:
         with:
           name: build-log
           path: build.log
+            - name: Cài đặt dependencies hệ thống
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends software-properties-common
+          add-apt-repository -y universe
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git zip unzip openjdk-17-jdk \
+            autoconf libtool pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev libtinfo5 \
+            cmake libffi-dev libssl-dev \
+            automake autopoint
