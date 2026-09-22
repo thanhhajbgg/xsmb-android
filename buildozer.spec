@@ -11,7 +11,7 @@ source.exclude_patterns = *.pyc,*.pyo,*.md,*.bat,*.ps1
 version = 1.0.0
 
 # Thêm cython để hỗ trợ build các thư viện C
-requirements = python3,kivy==2.3.0,cython,numpy==1.24.4,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna,pyjnius,android
+requirements = python3,kivy==2.3.0,cython,numpy==1.26.4,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna,pyjnius,android
 
 # Bootstrap
 p4a.bootstrap = sdl2
