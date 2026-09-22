@@ -1,22 +1,25 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
     inputs:
       build_type:
-        description: "Loại build (debug hoặc release)"
+        description: 'Loại build (debug / release)'
         required: true
-        default: "debug"
+        default: 'debug'
         type: choice
-        options: [debug, release]
+        options:
+          - debug
+          - release
+  push:
+    branches: [main, master]
 
 jobs:
   build:
+    name: Build APK trong kivy/buildozer
     runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
     container:
       image: kivy/buildozer:latest
       options: --user root
@@ -25,58 +28,70 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Cài đặt dependencies hệ thống
+      - name: Cho phép git trong container
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends wget
-          
-          # Tải và cài đặt thủ công libtinfo5 từ mirror của kernel.org
-          # (Gói này đã bị xóa khỏi các phiên bản Ubuntu mới hơn)
-          wget https://mirrors.kernel.org/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
-          apt-get install -y ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
-          
-          # Cài đặt các gói phụ thuộc còn lại
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+
+      - name: Cài thêm thư viện hệ thống thiếu cho p4a
+        run: |
+          apt-get update || true
           apt-get install -y --no-install-recommends \
-            git zip unzip openjdk-17-jdk \
-            autoconf libtool pkg-config zlib1g-dev \
-            libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev \
-            automake autopoint
+            libtinfo5 libncurses5 libncursesw5 \
+            libjpeg-turbo8 libjpeg-turbo8-dev \
+            libfreetype6 libfreetype6-dev \
+            zlib1g-dev libssl-dev libffi-dev \
+            || echo "Một số gói không cài được, tiếp tục..."
 
-      - name: Cache Buildozer
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.buildozer
-            .buildozer
-          key: buildozer-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-
-
-      - name: Xác định loại build
-        id: build_type
+      - name: Kiểm tra môi trường
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "type=${{ github.event.inputs.build_type }}" >> $GITHUB_OUTPUT
-          else
-            echo "type=debug" >> $GITHUB_OUTPUT
-          fi
+          echo "Python: $(python --version 2>&1)"
+          echo "Buildozer: $(buildozer --version 2>&1)"
+          echo "SDK: $ANDROIDSDK"
+          echo "NDK: $ANDROIDNDK"
+
+      - name: Xóa cache cũ (nếu có)
+        run: |
+          rm -rf .buildozer/android/platform/build-arm64-v8a || true
 
       - name: Build APK
+        env:
+          BUILDOZER_WARN_ON_ROOT: 0
         run: |
-          yes | buildozer -v android ${{ steps.build_type.outputs.type }} 2>&1 | tee build.log
+          set -o pipefail
+          buildozer -v android ${{ github.event.inputs.build_type || 'debug' }} 2>&1 | tee build.log
+
+      - name: In 200 dòng cuối log (nếu fail)
+        if: failure()
+        run: |
+          echo "=========================="
+          echo "200 DÒNG CUỐI BUILD LOG"
+          echo "=========================="
+          tail -200 build.log || true
+          echo "=========================="
+          echo "CÁC DÒNG CÓ TỪ KHÓA LỖI"
+          echo "=========================="
+          grep -niE "error|failed|traceback|not found|no module|cannot" build.log | tail -50 || true
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: xsmb-apk-${{ steps.build_type.outputs.type }}
+          name: xsmb-apk-${{ github.event.inputs.build_type || 'debug' }}
           path: bin/*.apk
+          retention-days: 30
           if-no-files-found: error
 
-      - name: Upload build log (nếu lỗi)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build.log
+      - name: In thông tin APK
+        if: success()
+        run: |
+          echo "=== APK đã build xong ==="
+          ls -lh bin/*.apk
