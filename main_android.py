@@ -1,148 +1,84 @@
-"""
-Entry point cho APK Android.
-Khởi động Python HTTP server trên localhost, sau đó hiển thị WebView.
-"""
+"""Kivy lifecycle with a real native Android WebView and local HTTP service."""
 import os
-import sys
 import threading
-import time
-import socket
+import logging
+from pathlib import Path
 
-# PHẢI import android_paths TRƯỚC kivy
-import android_paths  # noqa: F401  (tự động setup sys.path)
-
-# Cấu hình Kivy trước khi import
-os.environ.setdefault("KIVY_NO_ARGS", "1")
-os.environ.setdefault("KIVY_LOG_LEVEL", "info")
+import android_paths
+os.environ.setdefault('KIVY_NO_ARGS', '1')
 
 from kivy.app import App
 from kivy.clock import Clock
-from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
-from kivy.uix.widget import Widget
-
-try:
-    from android.runnable import run_on_ui_thread  # type: ignore
-except ImportError:
-    def run_on_ui_thread(f):
-        return f
-
-try:
-    from jnius import autoclass, cast  # type: ignore
-    WebView = autoclass("android.webkit.WebView")
-    WebViewClient = autoclass("android.webkit.WebViewClient")
-    WebChromeClient = autoclass("android.webkit.WebChromeClient")
-    PythonActivity = autoclass("org.kivy.android.PythonActivity")
-    LayoutParams = autoclass("android.view.ViewGroup$LayoutParams")
-    IS_ANDROID = True
-except Exception:
-    IS_ANDROID = False
-
-
-def find_free_port(start=8765, end=8865):
-    """Tìm cổng trống trong khoảng cho trước."""
-    for port in range(start, end):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(("127.0.0.1", port))
-                return port
-            except OSError:
-                continue
-    raise RuntimeError("Không tìm được cổng trống")
-
-
-def start_server(port):
-    """Chạy server trong thread riêng."""
-    def _run():
-        try:
-            # Import ở đây để tránh lỗi khi build
-            from src.pro_server import run_server  # type: ignore
-            run_server(host="127.0.0.1", port=port)
-        except Exception as e:
-            print(f"[server] Lỗi khởi động server: {e}")
-            import traceback
-            traceback.print_exc()
-
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
-    return t
-
-
-def wait_for_server(port, timeout=15.0):
-    """Đợi server sẵn sàng."""
-    start = time.time()
-    while time.time() - start < timeout:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
-                return True
-        except OSError:
-            time.sleep(0.2)
-    return False
-
-
-class RootWidget(BoxLayout):
-    def __init__(self, url, **kwargs):
-        super().__init__(orientation="vertical", **kwargs)
-        self.url = url
-        self.webview = None
-        self.status = Label(
-            text="Đang tải ứng dụng...",
-            font_size="16sp",
-            size_hint=(1, 1),
-            halign="center",
-            valign="middle",
-        )
-        self.add_widget(self.status)
-        Clock.schedule_once(lambda dt: self._setup_webview(), 0.5)
-
-    @run_on_ui_thread
-    def _setup_webview(self):
-        if not IS_ANDROID:
-            self.status.text = f"Server sẵn sàng tại: {self.url}\n(WebView chỉ chạy trên Android)"
-            return
-
-        try:
-            activity = PythonActivity.mActivity
-            webview = WebView(activity)
-            webview.getSettings().setJavaScriptEnabled(True)
-            webview.getSettings().setDomStorageEnabled(True)
-            webview.getSettings().setAllowFileAccess(True)
-            webview.getSettings().setAllowContentAccess(True)
-            webview.getSettings().setLoadWithOverviewMode(True)
-            webview.getSettings().setUseWideViewPort(True)
-            webview.setWebViewClient(WebViewClient())
-            webview.setWebChromeClient(WebChromeClient())
-            webview.loadUrl(self.url)
-
-            # Thay Label bằng WebView
-            self.clear_widgets()
-            self.add_widget(webview)
-            self.webview = webview
-        except Exception as e:
-            self.status.text = f"Lỗi WebView: {e}"
 
 
 class XSMBApp(App):
+    server = None
+    browser = None
+    stopping = False
+
     def build(self):
-        self.title = "XSMB Android"
-        port = find_free_port()
-        url = f"http://127.0.0.1:{port}/"
-        print(f"[main] Khởi động server tại {url}")
+        self.title = 'XSMB Android'
+        self.status = Label(text='Đang khởi động XSMB…',
+                            font_name=str(Path(__file__).parent / 'assets' / 'DejaVuSans.ttf'))
+        threading.Thread(target=self._start, daemon=True).start()
+        return self.status
 
-        start_server(port)
+    def _start(self):
+        try:
+            from src.pro_server import make_server
+            from src.paths import get_data_dir
+            logging.basicConfig(filename=get_data_dir() / 'android.log', level=logging.INFO)
+            # Bind once to port 0: no find-free-port race and no UI-thread blocking.
+            self.server = make_server()
+            if self.stopping:
+                self.server.server_close()
+                return
+            Clock.schedule_once(self._show_browser, 0)
+            self.server.serve_forever(poll_interval=0.2)
+        except Exception as exc:
+            logging.exception('Android startup failed')
+            message = f'Không khởi động được XSMB:\n{exc}'
+            Clock.schedule_once(lambda dt: setattr(self.status, 'text', message), 0)
+        finally:
+            if self.server:
+                self.server.server_close()
 
-        if not wait_for_server(port, timeout=15.0):
-            print("[main] Cảnh báo: server chưa sẵn sàng sau 15s")
-
-        return RootWidget(url)
+    def _show_browser(self, dt):
+        if self.stopping:
+            return
+        url = f'http://127.0.0.1:{self.server.server_port}/'
+        if not android_paths.IS_ANDROID:
+            self.status.text = f'XSMB: {url}'
+            return
+        try:
+            from jnius import autoclass
+            from android.runnable import run_on_ui_thread
+            @run_on_ui_thread
+            def attach():
+                try:
+                    activity = autoclass('org.kivy.android.PythonActivity').mActivity
+                    self.browser = autoclass('com.thanhhajbgg.xsmb.NativeBrowser').attach(activity, url)
+                except Exception as exc:
+                    logging.exception('WebView startup failed')
+                    message = f'Lỗi WebView:\n{exc}'
+                    Clock.schedule_once(lambda dt: setattr(self.status, 'text', message), 0)
+            attach()
+        except Exception as exc:
+            self.status.text = f'Lỗi Android: {exc}'
 
     def on_pause(self):
-        # Cho phép app chạy nền
         return True
 
-    def on_resume(self):
-        pass
+    def on_stop(self):
+        self.stopping = True
+        if self.server:
+            self.server.app.cancel_event.set()
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+        if self.browser:
+            from android.runnable import run_on_ui_thread
+            run_on_ui_thread(self.browser.destroy)()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     XSMBApp().run()

@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.buildozer/
+bin/
+build/
+dist/
+*.log
+*.db
+*.sqlite*
+*.apk
+*.aab
+*.jks
+*.keystore
+local.properties
