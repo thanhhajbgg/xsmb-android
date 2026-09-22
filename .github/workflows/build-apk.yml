@@ -30,9 +30,9 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends wget
           
-          # Tải và cài đặt thủ công libtinfo5 từ mirror của Đại học Qilu
+          # Tải và cài đặt thủ công libtinfo5 từ mirror của NLUUG (Hà Lan)
           # (Gói này đã bị xóa khỏi các phiên bản Ubuntu mới hơn)
-          wget https://mirrors.qlu.edu.cn/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.2_amd64.deb
+          wget https://ftp.nluug.nl/os/Linux/distr/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.2_amd64.deb
           apt-get install -y ./libtinfo5_6.3-2ubuntu0.2_amd64.deb
           
           # Cài đặt các gói phụ thuộc còn lại
