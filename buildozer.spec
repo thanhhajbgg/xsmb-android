@@ -10,10 +10,10 @@ source.exclude_patterns = *.pyc,*.pyo,*.md,*.bat,*.ps1
 
 version = 1.0.0
 
-# Yêu cầu Python packages — thứ tự quan trọng: python3 TRƯỚC, rồi kivy, rồi phần còn lại
-requirements = python3,kivy==2.3.0,numpy==1.26.4,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna,pyjnius,android
+# Thêm cython để hỗ trợ build các thư viện C
+requirements = python3,kivy==2.3.0,cython,numpy==1.24.4,beautifulsoup4,openpyxl,chardet,requests,urllib3,certifi,idna,pyjnius,android
 
-# Bootstrap: sdl2 là ổn định nhất cho WebView + Python server
+# Bootstrap
 p4a.bootstrap = sdl2
 p4a.fork = kivy
 p4a.branch = master
@@ -25,7 +25,9 @@ icon.filename = %(source.dir)s/assets/icon.png
 
 # Quyền Android
 android.permissions = INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
-android.api = 34
+
+# Hạ API xuống 33 để ổn định hơn
+android.api = 33
 android.minapi = 24
 android.ndk = 25b
 android.ndk_api = 24
