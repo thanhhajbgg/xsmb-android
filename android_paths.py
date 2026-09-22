@@ -1,42 +1,49 @@
-"""Đường dẫn riêng cho Android — gọi setup_android_paths() TRƯỚC khi import src.*"""
+"""
+Thiết lập sys.path và thư mục làm việc cho môi trường Android.
+Phải được import TRƯỚC kivy và các module khác.
+"""
 import os
 import sys
-from pathlib import Path
 
-_IS_ANDROID = hasattr(sys, "getandroidapilevel") or "ANDROID_ARGUMENT" in os.environ
-_APP_DIR = None
+def setup_android_paths():
+    """Thiết lập đường dẫn cho Android. Gọi hàm này ngay đầu main_android.py."""
+    try:
+        from android.storage import app_storage_path  # type: ignore
+        from jnius import autoclass  # type: ignore
+
+        # Lấy context ứng dụng
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        activity = PythonActivity.mActivity
+        app_dir = activity.getFilesDir().getAbsolutePath()
+
+        # Thư mục dữ liệu riêng của app
+        data_dir = os.path.join(app_dir, "data")
+        os.makedirs(data_dir, exist_ok=True)
+
+        # Thư mục cho file xuất Excel/CSV
+        exports_dir = os.path.join(app_dir, "exports")
+        os.makedirs(exports_dir, exist_ok=True)
+
+        # Đặt biến môi trường cho app biết
+        os.environ["XSMB_DATA_DIR"] = data_dir
+        os.environ["XSMB_EXPORTS_DIR"] = exports_dir
+
+        # Thêm thư mục gốc vào sys.path để import src.* và web.*
+        root = os.path.dirname(os.path.abspath(__file__))
+        if root not in sys.path:
+            sys.path.insert(0, root)
+
+        return True
+    except Exception as e:
+        print(f"[android_paths] Không phải môi trường Android hoặc lỗi: {e}")
+        # Fallback cho desktop
+        root = os.path.dirname(os.path.abspath(__file__))
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        os.environ.setdefault("XSMB_DATA_DIR", os.path.join(root, "data"))
+        os.environ.setdefault("XSMB_EXPORTS_DIR", os.path.join(root, "exports"))
+        return False
 
 
-def is_android() -> bool:
-    return _IS_ANDROID
-
-
-def app_data_dir() -> Path:
-    global _APP_DIR
-    if _APP_DIR is not None:
-        return _APP_DIR
-    if _IS_ANDROID:
-        base = os.environ.get("ANDROID_PRIVATE") or os.environ.get("ANDROID_APP_PATH") or str(Path.home())
-        _APP_DIR = Path(base) / "xsmb_data"
-    else:
-        base = os.environ.get("LOCALAPPDATA") or str(Path.home())
-        _APP_DIR = Path(base) / "XSMB_AI_Indicator"
-    _APP_DIR.mkdir(parents=True, exist_ok=True)
-    return _APP_DIR
-
-
-def db_path() -> Path:
-    return app_data_dir() / "xsmb.db"
-
-
-def log_path() -> Path:
-    return app_data_dir() / "app_v2.log"
-
-
-def setup_android_paths() -> None:
-    if not _IS_ANDROID:
-        return
-    base = str(app_data_dir())
-    os.environ.setdefault("XSMB_DATA_DIR", base)
-    os.environ.setdefault("HOME", base)
-    os.environ.setdefault("TMPDIR", base)
+# Tự động chạy khi import
+IS_ANDROID = setup_android_paths()
