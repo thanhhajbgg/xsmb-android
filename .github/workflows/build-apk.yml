@@ -6,81 +6,79 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      build_type:
-        description: "Loại build (debug hoặc release)"
-        required: true
-        default: "debug"
-        type: choice
-        options: [debug, release]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-22.04
-    container:
-      image: kivy/buildozer:latest
-      options: --user root
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements-test.txt
+      - run: python -m pytest -q
+      - run: node --check web/app.js
 
-      - name: Cài đặt dependencies hệ thống
+  build:
+    needs: test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install build dependencies
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends wget
-          
-          # Tải và cài đặt thủ công libtinfo5 từ mirror của Đại học Trier (Đức)
-          wget http://mirror.uni-trier.de/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.2_amd64.deb
-          apt-get install -y ./libtinfo5_6.3-2ubuntu0.2_amd64.deb
-          
-          # Cài đặt các gói phụ thuộc còn lại
-          apt-get install -y --no-install-recommends \
-            git zip unzip openjdk-17-jdk \
-            autoconf libtool pkg-config zlib1g-dev \
-            libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev \
-            automake autopoint
-
-      - name: Xóa cache cũ (nếu có)
-        run: |
-          rm -rf ~/.buildozer
-          rm -rf .buildozer
-
-      - name: Cache Buildozer
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip autoconf automake autopoint gettext libtool libltdl-dev \
+            pkg-config zlib1g-dev libncurses-dev libtinfo6 cmake \
+            libffi-dev libssl-dev build-essential ccache
+          python -m pip install -r requirements-build.txt
+      - name: Cache downloaded Android tools
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.buildozer
-            .buildozer
-          key: buildozer-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-
-
-      - name: Xác định loại build
-        id: build_type
+          path: ~/.buildozer/android/platform
+          key: android-tools-v3-${{ runner.os }}-${{ hashFiles('buildozer.spec', 'requirements-build.txt') }}
+      - name: Build installable debug APK
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "type=${{ github.event.inputs.build_type }}" >> $GITHUB_OUTPUT
-          else
-            echo "type=debug" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build APK
+          set -o pipefail
+          buildozer -v android debug 2>&1 | tee build.log
+      - name: Verify APK signature
+        shell: bash
         run: |
-          yes | buildozer -v android ${{ steps.build_type.outputs.type }} 2>&1 | tee build.log
-
+          apk=$(find bin -maxdepth 1 -name '*.apk' -print -quit)
+          test -n "$apk"
+          signer=$(find "$HOME/.buildozer/android/platform/android-sdk/build-tools" -name apksigner -type f | sort -V | tail -1)
+          "$signer" verify --verbose "$apk"
+          sha256sum "$apk" > bin/SHA256SUMS.txt
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: xsmb-apk-${{ steps.build_type.outputs.type }}
-          path: bin/*.apk
+          name: XSMB-Android-debug
+          path: |
+            bin/*.apk
+            bin/SHA256SUMS.txt
           if-no-files-found: error
-
-      - name: Upload build log (nếu lỗi)
-        if: failure()
+          retention-days: 30
+      - name: Upload build log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
+          name: XSMB-build-log
           path: build.log
+          if-no-files-found: ignore
