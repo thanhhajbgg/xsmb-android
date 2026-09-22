@@ -42,6 +42,11 @@ jobs:
             cmake libffi-dev libssl-dev \
             automake autopoint
 
+      - name: Xóa cache cũ (nếu có)
+        run: |
+          rm -rf ~/.buildozer
+          rm -rf .buildozer
+
       - name: Cache Buildozer
         uses: actions/cache@v4
         with:
